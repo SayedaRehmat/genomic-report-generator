@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-import vcf
+import vcfpy
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import tempfile
 
+# Load ClinVar-style annotations from sample TSV
 @st.cache_data
 def load_clinvar_annotations(file_path="variant_summary_sample.txt"):
     df = pd.read_csv(file_path, sep='\t', low_memory=False)
@@ -12,25 +13,27 @@ def load_clinvar_annotations(file_path="variant_summary_sample.txt"):
     db = df.set_index('RS# (dbSNP)')[['GeneSymbol', 'ClinicalSignificance', 'PhenotypeList']].to_dict(orient='index')
     return db
 
+# Annotate each VCF record using the local annotation DB
 def annotate_variant(record, annotation_db):
     annotations = []
+    variant_id = record.ID
+    if not variant_id or variant_id not in annotation_db:
+        return annotations
+    ann = annotation_db[variant_id]
     for alt in record.ALT:
-        variant_id = record.ID
-        if not variant_id or variant_id not in annotation_db:
-            continue
-        ann = annotation_db[variant_id]
         annotations.append({
             "CHROM": record.CHROM,
             "POS": record.POS,
             "ID": variant_id,
             "REF": record.REF,
-            "ALT": str(alt),
+            "ALT": str(alt.value),
             "Gene": ann["GeneSymbol"],
             "Impact": ann["ClinicalSignificance"],
             "Condition": ann["PhenotypeList"]
         })
     return annotations
 
+# Generate a clinical-style PDF report
 def generate_pdf_report(annotations, output_pdf):
     c = canvas.Canvas(output_pdf, pagesize=letter)
     width, height = letter
@@ -48,17 +51,20 @@ def generate_pdf_report(annotations, output_pdf):
             y = height - 50
     c.save()
 
-# Streamlit UI
+# Streamlit Web UI
 st.title("🧬 Genomic Report Generator")
-uploaded_file = st.file_uploader("Upload a VCF file", type=["vcf"])
+st.markdown("Upload a **VCF file** to automatically generate a clinical variant PDF report.")
+
+uploaded_file = st.file_uploader("Upload VCF file", type=["vcf"])
+
 if uploaded_file:
-    st.success("File uploaded. Processing...")
+    st.success("✅ File uploaded. Parsing...")
     annotation_db = load_clinvar_annotations()
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".vcf") as tmp_vcf:
         tmp_vcf.write(uploaded_file.read())
         tmp_vcf.flush()
-        reader = vcf.Reader(filename=tmp_vcf.name)
+        reader = vcfpy.Reader.from_path(tmp_vcf.name)
         annotations = []
         for record in reader:
             ann = annotate_variant(record, annotation_db)
@@ -67,8 +73,8 @@ if uploaded_file:
     if annotations:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
             generate_pdf_report(annotations, tmp_pdf.name)
-            st.success("PDF report generated.")
+            st.success("📄 PDF report generated.")
             with open(tmp_pdf.name, "rb") as f:
-                st.download_button("Download PDF Report", f.read(), file_name="genomic_report.pdf")
+                st.download_button("📥 Download PDF Report", f.read(), file_name="genomic_report.pdf")
     else:
-        st.warning("No known variants found.")
+        st.warning("⚠️ No known variants matched the database.")
