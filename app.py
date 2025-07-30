@@ -5,7 +5,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import tempfile
 
- @st.cache_data
+@st.cache_data
 def load_clinvar_annotations(file_path="variant_summary_sample.tsv"):
     try:
         df = pd.read_csv(file_path, sep='\t', low_memory=False)
