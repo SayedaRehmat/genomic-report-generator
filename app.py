@@ -5,13 +5,25 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import tempfile
 
-# Load ClinVar-style annotations from sample TSV
-@st.cache_data
-def load_clinvar_annotations(file_path="variant_summary_sample.txt"):
-    df = pd.read_csv(file_path, sep='\t', low_memory=False)
-    df = df[df['Assembly'] == 'GRCh38']
-    db = df.set_index('RS# (dbSNP)')[['GeneSymbol', 'ClinicalSignificance', 'PhenotypeList']].to_dict(orient='index')
-    return db
+ @st.cache_data
+def load_clinvar_annotations(file_path="variant_summary_sample.tsv"):
+    try:
+        df = pd.read_csv(file_path, sep='\t', low_memory=False)
+
+        # Debug: print header
+        st.write("🔍 Detected columns:", df.columns.tolist())
+
+        if 'Assembly' not in df.columns:
+            st.error("❌ Column 'Assembly' not found in annotation file.")
+            return {}
+
+        df = df[df['Assembly'] == 'GRCh38']
+        db = df.set_index('RS# (dbSNP)')[['GeneSymbol', 'ClinicalSignificance', 'PhenotypeList']].to_dict(orient='index')
+        return db
+    except Exception as e:
+        st.error(f"❌ Error loading annotation file: {e}")
+        return {}
+
 
 # Annotate each VCF record using the local annotation DB
 def annotate_variant(record, annotation_db):
