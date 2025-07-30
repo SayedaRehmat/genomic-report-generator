@@ -1,0 +1,5 @@
+#Downloaded from ClinVar
+#Assembly	RS# (dbSNP)	GeneSymbol	ClinicalSignificance	PhenotypeList
+GRCh38	rs123	BRCA1	Pathogenic	Breast cancer
+GRCh38	rs456	TP53	Likely pathogenic	Li-Fraumeni syndrome
+GRCh38	rs789	CFTR	Benign	Cystic fibrosis
